@@ -32,6 +32,92 @@ bool isInside(Mat img, Point p) {
 		return false;
 }
 
+Vec3b* randomColors()
+{
+	default_random_engine gen;
+	uniform_int_distribution<int> d(0, 255);
+	uchar x = d(gen);
+	Vec3b color[1000];
+	for (int i = 0; i < 1000; i++)
+		color[i] = Vec3b(d(gen), d(gen), d(gen));
+	return color;
+}
+void coloring(Mat_<uchar> labels) {
+
+
+	int height = labels.rows;
+	int width = labels.cols;
+	Mat_<Vec3b> dst(height, width, CV_8UC3);
+	Vec3b* colors = randomColors();
+	for (int i = 0; i < height; i++)
+	{
+		for (int j = 0; j < width; j++) {
+			if (labels(i, j) == 0)
+				dst(i, j) = Vec3b(255, 255, 255);
+			else
+				dst(i, j) = colors[labels(i, j)];
+		}
+	}
+	imshow("Output", dst);
+}
+const vector<Point2i> N4 = { Point2i(-1,0),Point2i(0,-1),Point2i(0,1) ,Point2i(1,0) };
+const vector<Point2i> N8 = { Point2i(-1,-1),Point2i(-1,0),Point2i(-1,1) ,Point2i(0,-1) ,Point2i(0,1) ,Point2i(1,-1), Point2i(1,0) ,Point2i(1,1) };
+
+void etichetare()
+{
+	char fileName[MAX_PATH];
+	while (openFileDlg(fileName))
+	{
+		Mat_<uchar> src = imread(fileName, IMREAD_GRAYSCALE);
+		int height = src.rows;
+		int width = src.cols;
+		int label = 255;
+
+		Mat_<uchar> labels = Mat::zeros(height, width, CV_8UC1);
+		for (int i = 0; i < height; i++)
+		{
+			for (int j = 0; j < width; j++) {
+				if (src(i, j) == 0 && labels(i, j) == 0)
+				{
+					label -= 1;
+					queue <Point2i> Q;
+					labels(i, j) = label;
+					Point2i point(j, i);
+					Q.push(point);
+					while (!Q.empty())
+					{
+						Point2i point = Q.front();
+						Q.pop();
+						int pj = point.x;
+						int pi = point.y;
+						for (int k = 0; k < N4.size(); k++)
+						{
+							Point2i n = point + N4[k];
+							int ni = n.y;
+							int nj = n.x;
+							if (isInside(src, ni, nj)) {
+								Point2i p(nj, ni);
+								uchar neighborValue = src(p);
+								uchar neighborLabel = labels(p);
+								if (neighborLabel == 0 && neighborValue == 0)
+								{
+									labels(p) = label;
+									Q.push(p);
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		coloring(labels);
+		imshow("Input", src);
+
+		waitKey();
+		destroyAllWindows();
+	}
+}
+
 int main()
 {
 	cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_FATAL);
