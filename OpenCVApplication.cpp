@@ -14,6 +14,23 @@ using namespace std;
 using namespace cv;
 wchar_t* projectPath;
 
+bool isInside(Mat img, int i, int j) {
+	int height = img.rows;
+	int width = img.cols;
+	if (i <= height && j <= width && i >= 0 && j >= 0)
+		return true;
+	else
+		return false;
+}
+
+bool isInside(Mat img, Point p) {
+	int height = img.rows;
+	int width = img.cols;
+	if (p.x <= height && p.y <= width && p.x >= 0 && p.y >= 0)
+		return true;
+	else
+		return false;
+}
 
 int main()
 {
@@ -35,6 +52,7 @@ int main()
 		scanf("%d", &op);
 		switch (op)
 		{
+
 		case 1:
 			break;
 		}
