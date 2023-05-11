@@ -26,7 +26,7 @@ bool isInside(Mat img, int i, int j) {
 bool isInside(Mat img, Point p) {
 	int height = img.rows;
 	int width = img.cols;
-	if (p.x <= height && p.y <= width && p.x >= 0 && p.y >= 0)
+	if (p.y <= height && p.x <= width && p.y >= 0 && p.x >= 0)
 		return true;
 	else
 		return false;
@@ -141,6 +141,142 @@ void erosionImg() {
 		waitKey(0);
 	}
 }
+Mat_<uchar> opening(Mat_<uchar> src, std::vector<Point2i> EL, uchar object)
+{
+	uchar background = object == 0 ? 255 : 0;
+	uchar val;
+	int height = src.rows;
+	int width = src.cols;
+	Mat_<uchar> dst(height, width, background);
+	for (int i = 1; i < height - 1; i++) {
+		for (int j = 1; j < width - 1; j++) {
+			Point2i point(j, i);
+			val = src(point);
+			if (val == object) {
+				bool ok = true;
+				for (int k = 0; k < EL.size(); k++)
+				{
+					Point2i n = point + EL[k];
+					if (src(n) != object)
+					{
+						ok = false;
+						break;
+					}
+				}
+				if (ok)
+					dst(point) = object;
+			}
+		}
+	}
+	Mat_<uchar> dst2 = dst.clone();
+	for (int i = 1; i < height - 1; i++) {
+		for (int j = 1; j < width - 1; j++) {
+			Point2i point(j, i);
+			val = dst(point);
+			if (val == object) {
+				for (int k = 0; k < EL.size(); k++)
+				{
+					Point2i n = point + EL[k];
+					dst2(n) = object;
+				}
+			}
+		}
+	}
+	return dst2;
+
+}
+void openingImg() {
+	char fname[MAX_PATH];
+	while (openFileDlg(fname)) {
+		Mat_<uchar> src = imread(fname, IMREAD_GRAYSCALE);
+		int object;
+		/*cout << "Object color value : ";
+						cin >> object;*/
+		Mat_<uchar> dst = opening(src, N4, 0);
+		imshow("src", src);
+		imshow("dst", dst);
+		waitKey(0);
+	}
+}
+Mat_<uchar> negative(Mat_<uchar> src)
+{
+	int height = src.rows;
+	int width = src.cols;
+	Mat_<uchar> dst(height, width);
+	for (int i = 0; i < height; i++) {
+		for (int j = 0; j < width; j++)
+			dst(i, j) = src(i, j) == 255 ? 0 : 255;
+	}
+	return dst;
+}
+Mat_<uchar> sub(Mat_<uchar> src1, Mat_<uchar> src2)
+{
+	int height = src1.rows;
+	int width = src1.cols;
+	Mat_<uchar> dst(height, width);
+	for (int i = 0; i < height; i++) {
+		for (int j = 0; j < width; j++) {
+			dst(i, j) = src1(i, j) - src2(i, j);
+			if (dst(i, j) < 0)
+				dst(i, j) = 0;
+
+		}
+
+	}
+	return dst;
+}
+Mat_<uchar> bite_or(Mat_<uchar> src1, Mat_<uchar> src2)
+{
+	int height = src1.rows;
+	int width = src1.cols;
+	Mat_<uchar> dst(height, width);
+	for (int i = 0; i < height; i++) {
+		for (int j = 0; j < width; j++) {
+			dst(i, j) = src1(i, j) | src2(i, j);
+		}
+	}
+	return dst;
+}
+bool empty(Mat_<uchar> src)
+{
+	int height = src.rows;
+	int width = src.cols;
+	bool ok = true;
+	for (int i = 0; i < height; i++) {
+		for (int j = 0; j < width; j++)
+			if (src(i, j) != 0)
+				ok = false;
+	}
+	return ok;
+}
+void skeleton() {
+
+	char fname[MAX_PATH];
+	while (openFileDlg(fname))
+	{
+		Mat_<uchar> src = imread(fname, IMREAD_GRAYSCALE);
+		int width = src.cols;
+		int height = src.rows;
+		Mat_<uchar> skel = Mat_<uchar>::zeros(height, width);
+		cv::Mat temp;
+		cv::Mat eroded;
+		src = negative(src);
+		bool done;
+		do
+		{
+			eroded = erosion(src, N4, 255);
+			temp = dilatation(eroded, N4, 255);
+			temp = sub(src, temp);
+			skel = skel | temp;
+			eroded.copyTo(src);
+			done = empty(src);// (cv::countNonZero(src) == 0);
+		} while (!done);
+
+		imshow("skeleton", skel);
+		imshow("src", src);
+		waitKey(0);
+	}
+}
 void labeling()
 {
 	char fileName[MAX_PATH];
@@ -171,16 +307,13 @@ void labeling()
 						for (int k = 0; k < N4.size(); k++)
 						{
 							Point2i n = point + N4[k];
-							int ni = n.y;
-							int nj = n.x;
-							if (isInside(src, ni, nj)) {
-								Point2i p(nj, ni);
-								uchar neighborValue = src(p);
-								uchar neighborLabel = labels(p);
+							if (isInside(src, n)) {
+								uchar neighborValue = src(n);
+								uchar neighborLabel = labels(n);
 								if (neighborLabel == 0 && neighborValue == 0)
 								{
-									labels(p) = label;
-									Q.push(p);
+									labels(n) = label;
+									Q.push(n);
 								}
 							}
 						}
@@ -195,7 +328,33 @@ void labeling()
 		destroyAllWindows();
 	}
 }
-
+void cropIMG()
+{
+	char fileName[MAX_PATH];
+	while (openFileDlg(fileName))
+	{
+		Mat_<uchar> src = imread(fileName, IMREAD_GRAYSCALE);
+		Rect crop = Rect(src.cols / 4, src.rows / 4, src.cols / 2, src.rows / 2);
+		std::vector<cv::Point> shape = std::vector<cv::Point>();
+		Mat_<uchar> cropImg = src(crop);
+		imshow("Input", src);
+		imshow("Crop", cropImg);
+		waitKey();
+	}
+}
+void contour()
+{
+	char fileName[MAX_PATH];
+	while (openFileDlg(fileName))
+	{
+		Mat_<uchar> src = imread(fileName, IMREAD_GRAYSCALE);
+		Mat_<uchar> dst = dilatation(src, N4, 0);
+		dst = sub(src, dst);
+		imshow("Input", src);
+		imshow("Contour", dst);
+		waitKey();
+	}
+}
 int main()
 {
 	cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_FATAL);
@@ -223,6 +382,14 @@ int main()
 			dilatationImg(); break;
 		case 3:
 			erosionImg(); break;
+		case 4:
+			openingImg(); break;
+		case 5:
+			skeleton(); break;
+		case 6:
+			cropIMG(); break;
+		case 7:
+			contour(); break;
 		}
 	} while (op != 0);
 	return 0;
