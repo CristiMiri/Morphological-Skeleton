@@ -63,7 +63,85 @@ void coloring(Mat_<uchar> labels) {
 const vector<Point2i> N4 = { Point2i(-1,0),Point2i(0,-1),Point2i(0,1) ,Point2i(1,0) };
 const vector<Point2i> N8 = { Point2i(-1,-1),Point2i(-1,0),Point2i(-1,1) ,Point2i(0,-1) ,Point2i(0,1) ,Point2i(1,-1), Point2i(1,0) ,Point2i(1,1) };
 
-void etichetare()
+Mat_<uchar> dilatation(Mat_<uchar> src, std::vector<Point2i> EL, uchar object)
+{
+	uchar background = object == 0 ? 255 : 0;
+	uchar val;
+	int height = src.rows;
+	int width = src.cols;
+	Mat_<uchar> dst(height, width, background);
+	for (int i = 1; i < height - 1; i++) {
+		for (int j = 1; j < width - 1; j++) {
+			Point2i point(j, i);
+			val = src(point);
+			if (val == object) {
+				for (int k = 0; k < EL.size(); k++)
+				{
+					Point2i n = point + EL[k];
+					dst(n) = object;
+				}
+			}
+		}
+	}
+	return dst;
+}
+void dilatationImg() {
+	char fname[MAX_PATH];
+	while (openFileDlg(fname)) {
+		Mat_<uchar> src = imread(fname, IMREAD_GRAYSCALE);
+		int object;
+		/*cout << "Object color value : ";
+		cin >> object;*/
+		Mat_<uchar> dst = dilatation(src, N4, 0);
+
+		imshow("src", src);
+		imshow("dst", dst);
+		waitKey(0);
+	}
+}
+Mat_<uchar> erosion(Mat_<uchar> src, std::vector<Point2i> EL, uchar object)
+{
+	uchar background = object == 0 ? 255 : 0;
+	uchar val;
+	int height = src.rows;
+	int width = src.cols;
+	Mat_<uchar> dst(height, width, background);
+	for (int i = 1; i < height - 1; i++) {
+		for (int j = 1; j < width - 1; j++) {
+			Point2i point(j, i);
+			val = src(point);
+			if (val == object) {
+				bool ok = true;
+				for (int k = 0; k < EL.size(); k++)
+				{
+					Point2i n = point + EL[k];
+					if (src(n) != object)
+					{
+						ok = false;
+						break;
+					}
+				}
+				if (ok)
+					dst(point) = object;
+			}
+		}
+	}
+	return dst;
+}
+void erosionImg() {
+	char fname[MAX_PATH];
+	while (openFileDlg(fname)) {
+		Mat_<uchar> src = imread(fname, IMREAD_GRAYSCALE);
+		int object;
+		/*cout << "Object color value : ";
+				cin >> object;*/
+		Mat_<uchar> dst = erosion(src, N4, 0);
+		imshow("src", src);
+		imshow("dst", dst);
+		waitKey(0);
+	}
+}
+void labeling()
 {
 	char fileName[MAX_PATH];
 	while (openFileDlg(fileName))
@@ -140,7 +218,11 @@ int main()
 		{
 
 		case 1:
-			break;
+			labeling(); break;
+		case 2:
+			dilatationImg(); break;
+		case 3:
+			erosionImg(); break;
 		}
 	} while (op != 0);
 	return 0;
