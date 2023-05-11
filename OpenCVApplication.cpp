@@ -31,7 +31,7 @@ bool isInside(Mat img, Point p) {
 	else
 		return false;
 }
-
+Vec3b* colors = new Vec3b[1000];
 Vec3b* randomColors()
 {
 	default_random_engine gen;
@@ -42,7 +42,7 @@ Vec3b* randomColors()
 		color[i] = Vec3b(d(gen), d(gen), d(gen));
 	return color;
 }
-void coloring(Mat_<uchar> labels) {
+Mat_<Vec3b> coloring(Mat_<uchar> labels) {
 
 
 	int height = labels.rows;
@@ -58,7 +58,8 @@ void coloring(Mat_<uchar> labels) {
 				dst(i, j) = colors[labels(i, j)];
 		}
 	}
-	imshow("Output", dst);
+	//imshow("Output", dst);
+	return dst;
 }
 const vector<Point2i> N4 = { Point2i(-1,0),Point2i(0,-1),Point2i(0,1) ,Point2i(1,0) };
 const vector<Point2i> N8 = { Point2i(-1,-1),Point2i(-1,0),Point2i(-1,1) ,Point2i(0,-1) ,Point2i(0,1) ,Point2i(1,-1), Point2i(1,0) ,Point2i(1,1) };
@@ -209,6 +210,38 @@ Mat_<uchar> negative(Mat_<uchar> src)
 	}
 	return dst;
 }
+Rect extractcolor(Mat_<uchar> labels)
+{
+	int height = labels.rows;
+	int width = labels.cols;
+	int x = height, y = width;
+	int Rheight = 0, Rwidth = 0;
+	for (int i = 0; i < height; i++) {
+		for (int j = 0; j < width; j++)
+			if (labels(i, j) == 254)
+			{
+				if (i < x)
+					x = i;
+				if (j < y)
+					y = j;
+				if (i > Rheight)
+					Rheight = i;
+				if (j > Rwidth)
+					Rwidth = j;
+			}
+	}
+	cout << "X is " << x << endl;
+	cout << "Y is " << y << endl;
+	cout << "Rheight is " << Rheight << endl;
+	cout << "Rwidth is " << Rwidth << endl;
+	Rect crop = Rect(y, x, Rwidth - y, Rheight - x);
+	Mat_<uchar> dst = labels(crop);
+	imshow("dst", dst);
+
+	return crop;
+
+
+}
 Mat_<uchar> sub(Mat_<uchar> src1, Mat_<uchar> src2)
 {
 	int height = src1.rows;
@@ -321,9 +354,13 @@ void labeling()
 				}
 			}
 		}
-		coloring(labels);
+		Mat_<Vec3b> dst = coloring(labels);
+		Rect r = extractcolor(labels);
+		Mat_<Vec3b> crop = dst(r);
 		imshow("Input", src);
-
+		imshow("Labels", dst);
+		imshow("Crop", crop);
+		cout << "Number of labels is " << 255 - label << endl;
 		waitKey();
 		destroyAllWindows();
 	}
@@ -355,6 +392,7 @@ void contour()
 		waitKey();
 	}
 }
+
 int main()
 {
 	cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_FATAL);
