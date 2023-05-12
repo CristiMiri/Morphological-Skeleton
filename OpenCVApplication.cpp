@@ -32,30 +32,31 @@ bool isInside(Mat img, Point p) {
 		return false;
 }
 Vec3b* colors = new Vec3b[1000];
-Vec3b* randomColors()
+
+Vec3b* randomColors(int nrLabels)
 {
 	default_random_engine gen;
 	uniform_int_distribution<int> d(0, 255);
 	uchar x = d(gen);
-	Vec3b color[1000];
-	for (int i = 0; i < 1000; i++)
+	Vec3b* color = new Vec3b[nrLabels];
+	for (int i = 0; i < nrLabels; i++)
 		color[i] = Vec3b(d(gen), d(gen), d(gen));
 	return color;
 }
-Mat_<Vec3b> coloring(Mat_<uchar> labels) {
+Mat_<Vec3b> coloring(Mat_<uchar> labels, int nrLabels) {
 
 
 	int height = labels.rows;
 	int width = labels.cols;
 	Mat_<Vec3b> dst(height, width, CV_8UC3);
-	Vec3b* colors = randomColors();
+	Vec3b* colors = randomColors(nrLabels);
 	for (int i = 0; i < height; i++)
 	{
 		for (int j = 0; j < width; j++) {
 			if (labels(i, j) == 0)
 				dst(i, j) = Vec3b(255, 255, 255);
 			else
-				dst(i, j) = colors[labels(i, j)];
+				dst(i, j) = colors[254 - labels(i, j)];
 		}
 	}
 	//imshow("Output", dst);
@@ -210,7 +211,7 @@ Mat_<uchar> negative(Mat_<uchar> src)
 	}
 	return dst;
 }
-Rect extractcolor(Mat_<uchar> labels)
+Rect extractcolor(Mat_<uchar> labels, int color)
 {
 	int height = labels.rows;
 	int width = labels.cols;
@@ -218,7 +219,7 @@ Rect extractcolor(Mat_<uchar> labels)
 	int Rheight = 0, Rwidth = 0;
 	for (int i = 0; i < height; i++) {
 		for (int j = 0; j < width; j++)
-			if (labels(i, j) == 254)
+			if (labels(i, j) == color)
 			{
 				if (i < x)
 					x = i;
@@ -236,7 +237,7 @@ Rect extractcolor(Mat_<uchar> labels)
 	cout << "Rwidth is " << Rwidth << endl;
 	Rect crop = Rect(y, x, Rwidth - y, Rheight - x);
 	Mat_<uchar> dst = labels(crop);
-	imshow("dst", dst);
+	//imshow("dst", dst);
 
 	return crop;
 
@@ -310,6 +311,20 @@ void skeleton() {
 		waitKey(0);
 	}
 }
+Mat_<Vec3b> convert(Mat_<uchar> src, Vec3b color)
+{
+	int height = src.rows;
+	int width = src.cols;
+	Mat_<Vec3b> dst(height, width);
+	for (int i = 0; i < height; i++) {
+		for (int j = 0; j < width; j++)
+			if (src(i, j) != 0)
+				dst(i, j) = color;
+			else
+				dst(i, j) = Vec3b(255, 255, 255);
+	}
+	return dst;
+}
 void labeling()
 {
 	char fileName[MAX_PATH];
@@ -354,13 +369,26 @@ void labeling()
 				}
 			}
 		}
-		Mat_<Vec3b> dst = coloring(labels);
-		Rect r = extractcolor(labels);
+		int nrLabels = 256 - label;
+		Mat_<Vec3b> dst = coloring(labels, nrLabels);
+		Rect r = extractcolor(labels, 254);
+		Rect r2 = extractcolor(labels, 253);
 		Mat_<Vec3b> crop = dst(r);
+		Mat_<Vec3b> crop2 = dst(r2);
+		Mat_<uchar> blanckcrop = labels(r);
+		Vec3b red = Vec3b(0, 0, 255);
+		Mat_<Vec3b> blanckcrop2 = convert(blanckcrop, red);
+		//blanckcrop2.copyTo(dst(r));
+		blanckcrop2.copyTo(dst(r));
 		imshow("Input", src);
-		imshow("Labels", dst);
-		imshow("Crop", crop);
-		cout << "Number of labels is " << 255 - label << endl;
+		imshow("Colored Image", dst);
+		imshow("Colored Crop", crop);
+		//imshow("Colored Crop2", crop2);
+		imshow("Blank Crop", blanckcrop);
+		imshow("Labels", labels);
+		imshow("Blank Crop2", blanckcrop2);
+		cout << "Number of labels is " << 256 - label << endl;
+
 		waitKey();
 		destroyAllWindows();
 	}
@@ -392,7 +420,23 @@ void contour()
 		waitKey();
 	}
 }
+void overlay()
+{
+	char fileName[MAX_PATH];
+	char fileName2[MAX_PATH];
 
+	while (openFileDlg(fileName) && openFileDlg(fileName2))
+	{
+		Mat_<uchar> src = imread(fileName, IMREAD_GRAYSCALE);
+		Mat_<uchar> smallimg = imread(fileName2, IMREAD_GRAYSCALE);
+		Rect r = Rect(0, 0, smallimg.cols, smallimg.rows);
+		smallimg.copyTo(src(r));
+		imshow("Input", src);
+		imshow("Overlay", smallimg);
+		waitKey();
+	}
+
+}
 int main()
 {
 	cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_FATAL);
@@ -428,6 +472,8 @@ int main()
 			cropIMG(); break;
 		case 7:
 			contour(); break;
+		case 8:
+			overlay(); break;
 		}
 	} while (op != 0);
 	return 0;
