@@ -43,13 +43,12 @@ Vec3b* randomColors(int nrLabels)
 		color[i] = Vec3b(d(gen), d(gen), d(gen));
 	return color;
 }
-Mat_<Vec3b> coloring(Mat_<uchar> labels, int nrLabels) {
+Mat_<Vec3b> coloring(Mat_<uchar> labels, int nrLabels, Vec3b* colors) {
 
 
 	int height = labels.rows;
 	int width = labels.cols;
 	Mat_<Vec3b> dst(height, width, CV_8UC3);
-	Vec3b* colors = randomColors(nrLabels);
 	for (int i = 0; i < height; i++)
 	{
 		for (int j = 0; j < width; j++) {
@@ -315,7 +314,7 @@ Mat_<uchar> skeleton(Mat_<uchar> src) {
 		temp = dilatation(eroded, N4, 255);
 		temp = sub(src, temp);
 		skel = skel | temp;
-		eroded.copyTo(src);
+		src = eroded;
 		done = empty(src);// (cv::countNonZero(src) == 0);
 	} while (!done);
 	return skel;
@@ -376,9 +375,9 @@ void labeling()
 						Q.pop();
 						int pj = point.x;
 						int pi = point.y;
-						for (int k = 0; k < N4.size(); k++)
+						for (int k = 0; k < N8.size(); k++)
 						{
-							Point2i n = point + N4[k];
+							Point2i n = point + N8[k];
 							if (isInside(src, n)) {
 								uchar neighborValue = src(n);
 								uchar neighborLabel = labels(n);
@@ -393,32 +392,41 @@ void labeling()
 				}
 			}
 		}
-		int nrLabels = 256 - label;
-		Mat_<Vec3b> dst = coloring(labels, nrLabels);
-		Rect r = extractcolor(labels, 254);
-		Rect r2 = extractcolor(labels, 253);
-		Mat_<Vec3b> crop = dst(r);
-		Mat_<Vec3b> crop2 = dst(r2);
-		Mat_<uchar> blanckcrop = labels(r);
-		blanckcrop = reassign(blanckcrop);
-		Mat_<Vec3b> blanckcrop3 = convert(blanckcrop, Vec3b(0, 0, 0));
-		Mat_<uchar> skel = skeleton(blanckcrop);
-		//blanckcrop = skeleton(blanckcrop);
-		Vec3b red = Vec3b(0, 0, 255);
-		Mat_<Vec3b> blanckcrop2 = convert(skel, red);
-		Mat_<Vec3b> overlayed = overlay(blanckcrop2, blanckcrop3);
-		//blanckcrop2.copyTo(dst(r));
-		overlayed.copyTo(dst(r));
-		imshow("Input", src);
+		int nrLabels = 255 - label;
+		imshow("src", src);
+		Vec3b* colors = randomColors(nrLabels);
+
+		Mat_<Vec3b> dst = coloring(labels, nrLabels, colors);
+		Mat_<uchar> disposable = labels.clone();
+		cout << "Number of labels is " << 255 - label << endl;
+		for (int i = 0; i < nrLabels; i++)
+		{
+			Rect r = extractcolor(labels, 254 - i);
+			Mat_<uchar> blanckcrop = disposable(r);
+			blanckcrop = reassign(blanckcrop);
+			Mat_<Vec3b> originalCrop = convert(blanckcrop, Vec3b(0, 0, 0));
+			Mat_<uchar> skel = skeleton(blanckcrop);
+			Vec3b red = Vec3b(0, 0, 255);
+			Mat_<Vec3b> blanckcrop2 = convert(skel, colors[i]);
+			Mat_<Vec3b> overlayed = overlay(blanckcrop2, originalCrop);
+			//imshow("overlayed", overlayed);
+			//Mat_<Vec3b> crop = dst(r);
+			//waitKey();
+			overlayed.copyTo(dst(r));
+		}
+		//Rect r2 = extractcolor(labels, 253);
+		//Mat_<Vec3b> crop2 = dst(r2);
+		////blanckcrop = skeleton(blanckcrop);
+		////blanckcrop2.copyTo(dst(r));
+		//imshow("Input", src);
 		imshow("Colored Image", dst);
-		imshow("Colored Crop", crop);
-		//imshow("Colored Crop2", crop2);
-		imshow("Blank Crop", blanckcrop3);
-		imshow("Labels", labels);
-		imshow("Skeleton", skel);
-		imshow("Blank Crop2", blanckcrop2);
-		imshow("Overlayed", overlayed);
-		cout << "Number of labels is " << 256 - label << endl;
+		//imshow("Colored Crop", crop);
+		////imshow("Colored Crop2", crop2);
+		//imshow("Blank Crop", blanckcrop3);
+		//imshow("Labels", labels);
+		//imshow("Skeleton", skel);
+		//imshow("Blank Crop2", blanckcrop2);
+		//imshow("Overlayed", overlayed);
 
 		waitKey();
 		destroyAllWindows();
