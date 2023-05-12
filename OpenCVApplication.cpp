@@ -200,14 +200,15 @@ void openingImg() {
 		waitKey(0);
 	}
 }
-Mat_<uchar> negative(Mat_<uchar> src)
+Mat_<uchar> negative(Mat_<uchar> src, int object = 0)
 {
 	int height = src.rows;
 	int width = src.cols;
+	int background = object == 0 ? 255 : 0;
 	Mat_<uchar> dst(height, width);
 	for (int i = 0; i < height; i++) {
 		for (int j = 0; j < width; j++)
-			dst(i, j) = src(i, j) == 255 ? 0 : 255;
+			dst(i, j) = src(i, j) == object ? background : object;
 	}
 	return dst;
 }
@@ -235,7 +236,7 @@ Rect extractcolor(Mat_<uchar> labels, int color)
 	cout << "Y is " << y << endl;
 	cout << "Rheight is " << Rheight << endl;
 	cout << "Rwidth is " << Rwidth << endl;
-	Rect crop = Rect(y, x, Rwidth - y, Rheight - x);
+	Rect crop = Rect(y, x, Rwidth - y + 1, Rheight - x + 1);
 	Mat_<uchar> dst = labels(crop);
 	//imshow("dst", dst);
 
@@ -283,34 +284,43 @@ bool empty(Mat_<uchar> src)
 	}
 	return ok;
 }
-void skeleton() {
-
-	char fname[MAX_PATH];
-	while (openFileDlg(fname))
-	{
-		Mat_<uchar> src = imread(fname, IMREAD_GRAYSCALE);
-		int width = src.cols;
-		int height = src.rows;
-		Mat_<uchar> skel = Mat_<uchar>::zeros(height, width);
-		cv::Mat temp;
-		cv::Mat eroded;
-		src = negative(src);
-		bool done;
-		do
-		{
-			eroded = erosion(src, N4, 255);
-			temp = dilatation(eroded, N4, 255);
-			temp = sub(src, temp);
-			skel = skel | temp;
-			eroded.copyTo(src);
-			done = empty(src);// (cv::countNonZero(src) == 0);
-		} while (!done);
-
-		imshow("skeleton", skel);
-		imshow("src", src);
-		waitKey(0);
+Mat_<uchar> reassign(Mat_<uchar> src)
+{
+	int height = src.rows;
+	int width = src.cols;
+	int color = 0;
+	Mat_<uchar> dst(height, width);
+	vector<int> colors;
+	for (int i = 0; i < height; i++) {
+		for (int j = 0; j < width; j++) {
+			if (src(i, j) != 0)
+				src(i, j) = 255;
+		}
 	}
+
+	return src;
 }
+Mat_<uchar> skeleton(Mat_<uchar> src) {
+
+	int width = src.cols;
+	int height = src.rows;
+	Mat_<uchar> skel = Mat_<uchar>::zeros(height, width);
+	cv::Mat temp;
+	cv::Mat eroded;
+	//src = negative(src, 255);
+	bool done;
+	do
+	{
+		eroded = erosion(src, N4, 255);
+		temp = dilatation(eroded, N4, 255);
+		temp = sub(src, temp);
+		skel = skel | temp;
+		eroded.copyTo(src);
+		done = empty(src);// (cv::countNonZero(src) == 0);
+	} while (!done);
+	return skel;
+}
+
 Mat_<Vec3b> convert(Mat_<uchar> src, Vec3b color)
 {
 	int height = src.rows;
@@ -322,6 +332,20 @@ Mat_<Vec3b> convert(Mat_<uchar> src, Vec3b color)
 				dst(i, j) = color;
 			else
 				dst(i, j) = Vec3b(255, 255, 255);
+	}
+	return dst;
+}
+Mat_<Vec3b> overlay(Mat_<Vec3b> src1, Mat_<Vec3b> src2)
+{
+	int height = src1.rows;
+	int width = src1.cols;
+	Mat_<Vec3b> dst(height, width);
+	for (int i = 0; i < height; i++) {
+		for (int j = 0; j < width; j++)
+			if (src1(i, j) != Vec3b(255, 255, 255))
+				dst(i, j) = src1(i, j);
+			else
+				dst(i, j) = src2(i, j);
 	}
 	return dst;
 }
@@ -376,17 +400,24 @@ void labeling()
 		Mat_<Vec3b> crop = dst(r);
 		Mat_<Vec3b> crop2 = dst(r2);
 		Mat_<uchar> blanckcrop = labels(r);
+		blanckcrop = reassign(blanckcrop);
+		Mat_<Vec3b> blanckcrop3 = convert(blanckcrop, Vec3b(0, 0, 0));
+		Mat_<uchar> skel = skeleton(blanckcrop);
+		//blanckcrop = skeleton(blanckcrop);
 		Vec3b red = Vec3b(0, 0, 255);
-		Mat_<Vec3b> blanckcrop2 = convert(blanckcrop, red);
+		Mat_<Vec3b> blanckcrop2 = convert(skel, red);
+		Mat_<Vec3b> overlayed = overlay(blanckcrop2, blanckcrop3);
 		//blanckcrop2.copyTo(dst(r));
-		blanckcrop2.copyTo(dst(r));
+		overlayed.copyTo(dst(r));
 		imshow("Input", src);
 		imshow("Colored Image", dst);
 		imshow("Colored Crop", crop);
 		//imshow("Colored Crop2", crop2);
-		imshow("Blank Crop", blanckcrop);
+		imshow("Blank Crop", blanckcrop3);
 		imshow("Labels", labels);
+		imshow("Skeleton", skel);
 		imshow("Blank Crop2", blanckcrop2);
+		imshow("Overlayed", overlayed);
 		cout << "Number of labels is " << 256 - label << endl;
 
 		waitKey();
@@ -467,7 +498,7 @@ int main()
 		case 4:
 			openingImg(); break;
 		case 5:
-			skeleton(); break;
+			break;//	skeleton(); break;
 		case 6:
 			cropIMG(); break;
 		case 7:
